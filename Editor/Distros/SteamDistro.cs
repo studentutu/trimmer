@@ -298,6 +298,7 @@ public class SteamDistro : DistroBase
                 switch (platformName) {
                     case "project":      return Path.GetDirectoryName(Application.dataPath);
                     case "scripts":      return Path.GetFullPath(scriptsFolder);
+                    case "description":  return description;
                     case "version":      return Application.version;
                     case "productname":  return Application.productName;
                     case "companyname":  return Application.companyName;
