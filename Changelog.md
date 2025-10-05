@@ -1,5 +1,8 @@
 # Changelog
 
+### 2.0.0-pre.19 (2025-10-05)
+* Fix `{{Description}}` variable in SteamDistro being interpreted as build target
+
 ### 2.0.0-pre.18 (2025-08-18)
 * Add support for `PrepareForBuild` callback in Options (to dynamically add streaming assets)
 * Prevent computer idle sleep while a distro is running (not implemented for Linux)
