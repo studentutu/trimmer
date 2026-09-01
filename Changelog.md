@@ -1,5 +1,12 @@
 # Changelog
 
+### 2.0.0-pre.21 (2026-09-01)
+* Track features injected during build, add log message that lists injections
+* Only ask to save scenes at the beginning, discard changes when scenes are changed during builds
+* SteamDistro: Determine version from build manifest(s) instead of using `Application.version`, add more version fields
+* iOSDistro: Fix update method in export options plist
+* ItchDistro: Fix `Application.version` being used even if build manifest exists
+
 ### 2.0.0-pre.19 (2025-10-05)
 * Fix `{{Description}}` variable in SteamDistro being interpreted as build target
 
