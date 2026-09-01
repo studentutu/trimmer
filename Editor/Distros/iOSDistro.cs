@@ -60,7 +60,7 @@ public class iOSDistro : DistroBase
 <plist version=""1.0"">
 <dict>
     <key>method</key>
-    <string>app-store</string>
+    <string>app-store-connect</string>
     <key>destination</key>
     <string>upload</string>
 </dict>
