@@ -58,16 +58,16 @@ public class OptionXcode : OptionContainer
 
             var preprocessorPath = System.IO.Path.Combine(report.summary.outputPath, "Classes/Preprocessor.h");
             if (!File.Exists(preprocessorPath)) {
-                Debug.LogError("Could not find Preprocessor.h at path: " + preprocessorPath);
+                Debug.LogError("OptionXcode.ForceDisableRemoteNotifications: Could not find Preprocessor.h at path: " + preprocessorPath);
                 return;
             }
 
             var contents = File.ReadAllText(preprocessorPath, Encoding.UTF8);
             if (!contents.Contains("#define UNITY_USES_REMOTE_NOTIFICATIONS ")) {
-                Debug.LogError("Could not find UNITY_USES_REMOTE_NOTIFICATIONS define in Preprocessor.h");
+                Debug.LogError("OptionXcode.ForceDisableRemoteNotifications: Could not find UNITY_USES_REMOTE_NOTIFICATIONS define in Preprocessor.h");
                 return;
             } else if (!contents.Contains("#define UNITY_USES_REMOTE_NOTIFICATIONS 1")) {
-                Debug.Log("Remote notifications already disabled, nothing to do.");
+                Debug.Log("OptionXcode.ForceDisableRemoteNotifications: Remote notifications already disabled, nothing to do.");
                 return;
             }
 
@@ -77,7 +77,7 @@ public class OptionXcode : OptionContainer
             );
             File.WriteAllText(preprocessorPath, contents);
 
-            Debug.Log("Force disabled remote notifications.");
+            Debug.Log("OptionXcode.ForceDisableRemoteNotifications: Force disabled remote notifications.");
         }
     }
 
@@ -97,7 +97,7 @@ public class OptionXcode : OptionContainer
 
             var plistPath = System.IO.Path.Combine(report.summary.outputPath, "Info.plist");
             if (!File.Exists(plistPath)) {
-                Debug.LogError("Could not find Info.plist at path: " + plistPath);
+                Debug.LogError("OptionXcode.AddEncryptionExemption: Could not find Info.plist at path: " + plistPath);
                 return;
             }
 
@@ -124,7 +124,7 @@ public class OptionXcode : OptionContainer
 
             info.WriteToFile(plistPath);
 
-            Debug.Log("Added Info.plist entry indicating the app only uses exempt encryption.");
+            Debug.Log("OptionXcode.AddEncryptionExemption: Added Info.plist entry indicating the app only uses exempt encryption.");
         }
     }
 
@@ -144,21 +144,25 @@ public class OptionXcode : OptionContainer
 
             var projectPath = System.IO.Path.Combine(report.summary.outputPath, "Unity-iPhone.xcodeproj");
             if (!Directory.Exists(projectPath)) {
-                Debug.LogError("Could not find Unity-iPhone.xcodeproj at path: " + projectPath);
+                Debug.LogError("OptionXcode.RenameScheme: Could not find Unity-iPhone.xcodeproj at path: " + projectPath);
                 return;
             }
 
             var basePath = System.IO.Path.Combine(projectPath, "xcshareddata/xcschemes");
             var schemePath = System.IO.Path.Combine(basePath, "Unity-iPhone.xcscheme");
             if (!File.Exists(schemePath)) {
-                Debug.Log("No default Unity scheme at path, possibly already renamed: " + schemePath);
+                Debug.Log("OptionXcode.RenameScheme: No default Unity scheme at path, possibly already renamed: " + schemePath);
                 return;
             }
 
             var newName = System.IO.Path.Combine(basePath, Application.productName + ".xcscheme");
-            File.Move(schemePath, newName);
+            if (File.Exists(newName)) {
+                Debug.Log("OptionXcode.RenameScheme: A scheme with the target name already exists: " + newName);
+                return;
+            }
 
-            Debug.Log("Renamed Unity's default scheme to " + Application.productName);
+            File.Move(schemePath, newName);
+            Debug.Log("OptionXcode.RenameScheme: Renamed Unity's default scheme to " + Application.productName);
         }
     }
 }
