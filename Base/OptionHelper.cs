@@ -107,6 +107,12 @@ public static class OptionHelper
         if (script == null) {
             if (!create) return null;
             script = container.AddComponent<T>();
+
+        #if UNITY_EDITOR
+            if (BuildPipeline.isBuildingPlayer) {
+                OnFeatureInjected?.Invoke(script);
+            }
+        #endif
         }
 
         return script;
@@ -208,6 +214,15 @@ public static class OptionHelper
 
         return GetSingleton<T>(true);
     }
+
+    /// <summary>
+    /// Event triggered when <see cref="InjectFeature"/> actually injects a script into the build.
+    /// </summary>
+    /// <remarks>
+    /// Only called during a player or asset bundle build, for <see cref="InjectFeature"/>
+    /// and <see cref="GetSingleton"/>.
+    /// </remarks>
+    public static event Action<Component> OnFeatureInjected;
 
     // ------ Execution ------
 

@@ -150,6 +150,18 @@ public class BuildManager : BuildPlayerProcessor, IProcessSceneWithReport, IPrep
         return CurrentProfile.GetInclusionOf(option, OptionHelper.currentBuildOptions.target);
     }
 
+    /// <summary>
+    /// Add an injected script to the injection log.
+    /// A summary is added to the build completed log message, listing all injected scripts.
+    /// </summary>
+    public static void TrackInjection(Component script)
+    {
+        if (script == null) return;
+
+        injectionLog ??= new();
+        injectionLog.Add($"'{script.GetType().Name}' on '{script.name}' in '{script.gameObject.scene.name}'");
+    }
+
     // -------- Building --------
 
     /// <summary>
@@ -676,6 +688,8 @@ public class BuildManager : BuildPlayerProcessor, IProcessSceneWithReport, IPrep
         var container = go.AddComponent<ProfileContainer>();
         ProfileContainer.Instance = container;
         container.store = GetCurrentEditProfile().Store;
+
+        TrackInjection(container);
     }
 
     /// <summary>
@@ -793,6 +807,7 @@ public class BuildManager : BuildPlayerProcessor, IProcessSceneWithReport, IPrep
 
     static string[] previousScriptingDefineSymbols;
     static bool includesAnyOption;
+    static List<string> injectionLog;
 
     [InitializeOnLoadMethod]
     static void RegisterBuildPlayerHandler()
@@ -872,11 +887,12 @@ public class BuildManager : BuildPlayerProcessor, IProcessSceneWithReport, IPrep
                 var inclusion = CurrentProfile == null ? OptionInclusion.Remove : CurrentProfile.GetInclusionOf(option, buildTarget);
                 option.PrepareForBuildWithContext(buildPlayerContext, inclusion);
             }
-        }
-        catch (Exception) {
+        } catch (Exception) {
             OnBuildError(null);
             throw;
         }
+
+        OptionHelper.OnFeatureInjected += TrackInjection;
     }
 
     // Unfortunately not a proper Unity event
@@ -888,8 +904,7 @@ public class BuildManager : BuildPlayerProcessor, IProcessSceneWithReport, IPrep
             if ((option.Capabilities & OptionCapabilities.ConfiguresBuild) == 0) continue;
             try {
                 option.OnBuildError(report);
-            }
-            catch (Exception e) {
+            } catch (Exception e) {
                 Debug.LogException(e);
             }
         }
@@ -909,11 +924,24 @@ public class BuildManager : BuildPlayerProcessor, IProcessSceneWithReport, IPrep
         // Run options' PostprocessBuild
         foreach (var option in GetCurrentEditProfile().OrderBy(o => o.PostprocessOrder)) {
             if ((option.Capabilities & OptionCapabilities.ConfiguresBuild) == 0) continue;
+            try {
             var inclusion = CurrentProfile == null ? OptionInclusion.Remove : CurrentProfile.GetInclusionOf(option, target);
             option.PostprocessBuild(report, inclusion);
+            } catch (Exception e) {
+                Debug.LogException(e);
+            }
         }
 
         RestoreScriptingDefineSymbolsInPlayerSettings(target);
+
+        Debug.Log(string.Format(
+            "Trimmer: Built profile '{0}' for '{1}' to '{2}'\n{3}",
+            CurrentProfile != null ? CurrentProfile.name : "null", 
+            target, report.summary.outputPath, 
+            (injectionLog != null && injectionLog.Count > 0)
+                ? $"Injected {injectionLog.Count} scripts:\n- " + injectionLog.Join("\n- ")
+                : "No injected scripts tracked"
+        ), CurrentProfile);
     }
 
     // Call this very late after a successful build,
@@ -930,6 +958,8 @@ public class BuildManager : BuildPlayerProcessor, IProcessSceneWithReport, IPrep
         OptionHelper.currentBuildOptions = default;
         BuildType = TrimmerBuildType.None;
         CurrentProfile = null;
+        injectionLog?.Clear();
+        OptionHelper.OnFeatureInjected -= TrackInjection;
     }
 
     public void OnProcessScene(Scene scene, [CanBeNull] BuildReport report)
