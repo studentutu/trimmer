@@ -492,10 +492,10 @@ public class BuildManager : BuildPlayerProcessor, IProcessSceneWithReport, IPrep
     /// > target is not the active build target. This can lead to issues where
     /// > build code for the given target is not run.
     /// </remarks>
-    public static BuildReport BuildSync(BuildProfile buildProfile, BuildPlayerOptions options)
+    public static BuildReport BuildSync(BuildProfile buildProfile, BuildPlayerOptions options, bool discardChangesWithoutAsking = false)
     {
         // Check for unsaved scenes
-        if (!HandleModifiedScenes()) {
+        if (!HandleModifiedScenes(discardChangesWithoutAsking)) {
             OnBuildError(null);
             return null;
         }
@@ -591,7 +591,7 @@ public class BuildManager : BuildPlayerProcessor, IProcessSceneWithReport, IPrep
     /// So it's better to not have an unsaved changes when doing a build.
     /// </remarks>
     /// <returns>`true` if build can proceed, `false` to cancel</returns>
-    static bool HandleModifiedScenes()
+    public static bool HandleModifiedScenes(bool discardChangesWithoutAsking = false)
     {
         if (Application.isBatchMode)
             return true;
@@ -608,20 +608,28 @@ public class BuildManager : BuildPlayerProcessor, IProcessSceneWithReport, IPrep
         if (dirtyScenes == null)
             return true;
 
-        int choice;
-
         var reloadScene = typeof(EditorSceneManager).GetMethod("ReloadScene", BindingFlags.Static | BindingFlags.NonPublic);
-        if (reloadScene != null) {
-            choice = EditorUtility.DisplayDialogComplex(
-                "Unsaved Scenes", "Modified Scenes must be saved or changes discarded to continue.",
-                "Save", "Cancel", "Discard Changes"
-            );
+        if (reloadScene == null) {
+            Debug.LogWarning($"Trimmer: 'EditorSceneManager.ReloadScene' method not found, unable to discard changes.");
+        }
+
+        int choice;
+        if (!discardChangesWithoutAsking) {
+            if (reloadScene != null) {
+                choice = EditorUtility.DisplayDialogComplex(
+                    "Unsaved Scenes", "Modified Scenes must be saved or changes discarded to continue.",
+                    "Save", "Cancel", "Discard Changes"
+                );
+            } else {
+                // Method for discarding changes not found, just offer saving
+                choice = EditorUtility.DisplayDialog(
+                    "Unsaved Scenes", "Modified Scenes must be saved to continue.",
+                    "Save", "Cancel"
+                ) ? 1 : 0;
+            }
         } else {
-            // Method for discarding changes not found, just offer saving
-            choice = EditorUtility.DisplayDialog(
-                "Unsaved Scenes", "Modified Scenes must be saved to continue.",
-                "Save", "Cancel"
-            ) ? 1 : 0;
+            // Discard changes if possible, cancel otherwise
+            choice = reloadScene != null ? 2 : 1;
         }
 
         if (choice == 0) {
@@ -925,8 +933,8 @@ public class BuildManager : BuildPlayerProcessor, IProcessSceneWithReport, IPrep
         foreach (var option in GetCurrentEditProfile().OrderBy(o => o.PostprocessOrder)) {
             if ((option.Capabilities & OptionCapabilities.ConfiguresBuild) == 0) continue;
             try {
-            var inclusion = CurrentProfile == null ? OptionInclusion.Remove : CurrentProfile.GetInclusionOf(option, target);
-            option.PostprocessBuild(report, inclusion);
+                var inclusion = CurrentProfile == null ? OptionInclusion.Remove : CurrentProfile.GetInclusionOf(option, target);
+                option.PostprocessBuild(report, inclusion);
             } catch (Exception e) {
                 Debug.LogException(e);
             }

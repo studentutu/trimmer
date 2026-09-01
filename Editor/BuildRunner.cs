@@ -182,6 +182,10 @@ public class BuildRunner : ScriptableObject
 
         EnsureNotRunning();
 
+        if (!BuildManager.HandleModifiedScenes()) {
+            throw new Exception($"Trimmer BuildRunner: Job aborted due to unsaved scene changes");
+        }
+
         var results = new ProfileBuildResult[jobs.Length];
         for (int i = 0; i < jobs.Length; i++) {
             var job = jobs[i];
@@ -444,7 +448,9 @@ public class BuildRunner : ScriptableObject
             if (!string.IsNullOrEmpty(job.outputPath))
                 options.locationPathName = job.outputPath;
 
-            report = BuildManager.BuildSync(job.profile, options);
+            // We asked at the beginning to discard changes
+            // Sometimes scene can be dirtied during a build, just discard those changes here
+            report = BuildManager.BuildSync(job.profile, options, discardChangesWithoutAsking: true);
             results[jobIndex].report = report;
         } catch (Exception e) {
             results[jobIndex] = ProfileBuildResult.Error(job.profile, e.Message);
