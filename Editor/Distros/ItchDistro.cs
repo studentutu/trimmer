@@ -108,7 +108,7 @@ public class ItchDistro : DistroBase
 
         var args = string.Format(
             "push '{0}' '{1}:{2}' --userversion '{3}' --ignore='*.DS_Store' --ignore='build.json'",
-            path, project, channel, Application.version
+            path, project, channel, version
         );
 
         await Execute(new ExecutionArgs(butlerPath, args), task);
