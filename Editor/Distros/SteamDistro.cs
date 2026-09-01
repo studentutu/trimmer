@@ -46,7 +46,11 @@ namespace sttz.Trimmer.Editor
 /// - `{{Project}}`: Path to the Unity project root
 /// - `{{Scripts}}`: Path to the original scripts folder
 /// - `{{Description}}`: Custom string set as <see cref="description"/>
-/// - `{{Version}}`: `Application.version` string
+/// - `{{Version}}`: "major.minor.patch" version of the builds.
+/// - `{{Build}}`: Highest build number of the builds.
+/// - `{{FullVersion}}`: Version including build (major.minor.patch+build).
+/// - `{{Commit}}`: Version control commit used when building (if available).
+/// - `{{Branch}}`: Version control branch name used when building (if available).
 /// - `{{ProductName}}`: `Application.productName` string
 /// - `{{CompanyName}}`: `Application.companyName` string
 /// - `{{UnityVersion}}`: `Application.unityVersion` string
@@ -286,6 +290,14 @@ public class SteamDistro : DistroBase
     {
         Directory.CreateDirectory(outputDir);
 
+        Version? version = null;
+        Version GetVersion()
+        {
+            if (version != null) return version.Value;
+            version = VersionFromBuildPaths(buildPaths);
+            return version.Value;
+        };
+
         var targets = new HashSet<BuildTarget>(buildPaths.Select(p => p.target));
         string convertError = null;
         foreach (var file in Directory.GetFiles(scriptsFolder)) {
@@ -299,7 +311,11 @@ public class SteamDistro : DistroBase
                     case "project":      return Path.GetDirectoryName(Application.dataPath);
                     case "scripts":      return Path.GetFullPath(scriptsFolder);
                     case "description":  return description;
-                    case "version":      return Application.version;
+                    case "version":      return GetVersion().MajorMinorPatch;
+                    case "build":        return GetVersion().build.ToString();
+                    case "fullversion":  return GetVersion().MajorMinorPatchBuild;
+                    case "commit":       return GetVersion().commit ?? "";
+                    case "branch":       return GetVersion().branch ?? "";
                     case "productname":  return Application.productName;
                     case "companyname":  return Application.companyName;
                     case "unityversion": return Application.unityVersion;
@@ -337,6 +353,48 @@ public class SteamDistro : DistroBase
         }
 
         return convertError;
+    }
+
+    /// <summary>
+    /// Determine the build version from the given build paths.
+    /// </summary>
+    /// <remarks>
+    /// This loads the `build.json` from the given build paths and compares the versions.
+    /// If the major.minor.patch versions don't match, a warning will be logged.
+    /// The highest version from all builds will be returned.
+    /// If no `build.json` can be found, a warning will be logged and <see cref="Application.version"/> returned.
+    /// </remarks>
+    static Version VersionFromBuildPaths(IEnumerable<BuildPath> buildPaths)
+    {
+        var version = default(Version);
+        var mismatchedVersions = false;
+
+        foreach (var path in buildPaths) {
+            var info = BuildInfo.FromPath(path.path);
+            if (info == null || !info.version.IsDefined) continue;
+
+            if (!mismatchedVersions && version.IsDefined && version.MajorMinorPatch != info.version.MajorMinorPatch) {
+                mismatchedVersions = true;
+            }
+
+            if (!version.IsDefined || info.version > version) {
+                version = info.version;
+            }
+        }
+
+        if (mismatchedVersions) {
+            Debug.LogWarning($"SteamDistro: Input builds have mismatched major.minor.patch versions, using highest version '{version.MajorMinorPatch}'");
+        }
+
+        if (!version.IsDefined) {
+            Debug.LogWarning($"SteamDistro: Could not determine version of builds, falling back to Application.version.");
+            version = Version.Parse(Application.version, out var error);
+            if (error != null) {
+                Debug.LogError($"SteamDistro: Failed to parse version from Application.version: {error}");
+            }
+        }
+
+        return version;
     }
 }
 
